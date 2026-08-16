@@ -1,6 +1,12 @@
-# [Project name]
+# KidTube
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A whitelisted, parent-controlled kid-safe YouTube front end (spec in `attached_assets/`). Currently: canvas design mockups plus a Vercel-ready Next.js mock app.
+
+## KidTube specifics
+
+- `kidtube/` — standalone Next.js App Router app (NOT part of the pnpm workspace; it has its own `package-lock.json`, install with `npm install` inside the folder). Intended for Vercel deployment with Root Directory = `kidtube`. Mock data only; API routes come later per the spec.
+- `artifacts/mockup-sandbox/src/components/mockups/kidtube/` — original "Sunny Lagoon" design mockups (Grid, Player, Manage) shown on the canvas.
+- Design tokens live in `kidtube/lib/kidtube.ts` (`kt` palette) and mirror `_shared/kidtube.tsx` in the mockups.
 
 ## Run & Operate
 
