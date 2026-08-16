@@ -1,0 +1,148 @@
+# KidTube — Kid-Safe YouTube Front End (PWA)
+
+A whitelisted, parent-controlled YouTube front end. Front end + Vercel serverless only, hosted free. Channel list lives in the Git repo; adding a channel triggers a commit and CI redeploy.
+
+---
+
+## 1. Goals
+
+- Kid sees a simple grid of videos **only** from parent-approved channels
+- No YouTube UI, no search, no comments, no suggested videos outside the whitelist
+- Installable as a PWA (home screen icon, fullscreen, works on tablet/phone)
+- Parent can add/remove channels from a hidden 3-dot menu, PIN-protected
+- Zero paid infrastructure: Vercel Hobby + GitHub free tier
+
+## 2. Architecture Overview
+
+```
+┌────────────────────────────────────────────┐
+│  Next.js PWA (Vercel)                      │
+│                                            │
+│  /            → video grid (kid-facing)    │
+│  /watch/[id]  → nocookie embed player      │
+│  /manage      → PIN-gated channel manager  │
+│                                            │
+│  /api/videos       → fetch uploads (YT API)│
+│  /api/add-channel  → commit to GitHub      │
+│  /api/remove-channel → commit to GitHub    │
+│  /api/search-channel → YT channel search   │
+└────────────────────────────────────────────┘
+         │                    │
+         ▼                    ▼
+  YouTube Data API v3    GitHub Contents API
+  (server-side key)      (PAT, repo-scoped)
+         ▲
+         │  push to main → Vercel auto-redeploy
+  channels.json (in repo, source of truth)
+```
+
+## 3. Data & Config
+
+### `channels.json` (repo root or `/data`)
+```json
+{
+  "channels": [
+    { "id": "UCxxxxxxxx", "name": "Channel Name", "thumbnail": "https://..." }
+  ]
+}
+```
+- Read by `/api/videos` at runtime (bundled at build)
+- Written only via GitHub Contents API commits
+
+### Environment variables (Vercel, server-side only)
+| Var | Purpose |
+|---|---|
+| `YOUTUBE_API_KEY` | YouTube Data API v3 key (never exposed to client) |
+| `GITHUB_TOKEN` | Fine-grained PAT, contents read/write, this repo only |
+| `GITHUB_REPO` | `owner/repo` |
+| `ADMIN_PIN` | PIN for the manage screen (checked server-side) |
+
+## 4. API Routes
+
+### `GET /api/videos`
+1. Read `channels.json` from the deployed bundle
+2. For each channel: resolve uploads playlist (`UC…` → `UU…` prefix swap, no extra API call needed) and call `playlistItems.list` (1 quota unit each)
+3. Merge all videos, sort by `publishedAt` desc, return top N (e.g. 60)
+4. Cache: `Cache-Control: s-maxage=3600, stale-while-revalidate=86400` so repeat loads hit the edge cache, not YouTube quota
+
+### `POST /api/add-channel` (PIN required)
+1. Validate PIN from request header/body against `ADMIN_PIN`
+2. Fetch current `channels.json` via GitHub Contents API (get SHA)
+3. Append channel `{ id, name, thumbnail }`, de-dupe by id
+4. `PUT` updated file with commit message `chore: add channel <name>`
+5. Vercel redeploys automatically (~1–2 min); respond with "pending deploy" status
+
+### `POST /api/remove-channel` (PIN required)
+Same flow, removes by channel id, commit message `chore: remove channel <name>`.
+
+### `GET /api/search-channel?q=` (PIN required)
+- Calls YouTube `search.list` with `type=channel` (100 quota units — parent-only, rare)
+- Returns id, title, thumbnail for the manage screen picker
+
+## 5. Frontend
+
+### Kid-facing grid (`/`)
+- Big thumbnails, channel avatar + video title, no descriptions, no view counts
+- No search box, no address-bar affordances
+- Pull-to-refresh / refresh button hits `/api/videos`
+- Optional: group by channel or single chronological feed (start with chronological)
+
+### Player (`/watch/[videoId]`)
+- `https://www.youtube-nocookie.com/embed/{id}?rel=0&modestbranding=1&fs=1&playsinline=1`
+- Big back button, nothing else
+- `rel=0` limits end-screen suggestions to the same channel
+
+### Manage screen (`/manage`)
+- Reached only via a small `⋮` menu on the grid (visually de-emphasized)
+- PIN entry gate (PIN sent with each write request, validated server-side — never stored client-side beyond the session)
+- Search channels → tap to add
+- Current channel list with remove buttons
+- Banner after add/remove: "Updating… new channels appear in ~2 minutes" (redeploy latency)
+
+## 6. PWA Layer
+
+- `manifest.json`: name, icons (192/512), `display: standalone`, portrait orientation, theme color
+- Service worker:
+  - Cache app shell (HTML/CSS/JS) — cache-first
+  - Cache thumbnails — stale-while-revalidate
+  - `/api/videos` — network-first with cached fallback (app still shows last feed offline; playback obviously needs network)
+- iOS/Android: verify install prompt + standalone behavior on the actual kid device
+
+## 7. Security / Parental Controls
+
+- YouTube API key: server-side env var only
+- GitHub PAT: fine-grained, single repo, contents scope only
+- PIN checked server-side on every write route (rate-limit attempts: simple in-memory counter or small delay)
+- Kid device: install PWA, optionally use OS-level guided access / app pinning so they can't leave the app
+
+## 8. Known Tradeoffs (accepted)
+
+- Channel add/remove takes ~1–2 min (commit → rebuild) — fine for rare parent actions
+- Repo history accumulates channel-change commits — harmless
+- Video freshness bounded by the 1h edge cache (tunable)
+- YouTube embeds require network; offline mode only shows the cached grid
+
+## 9. Build Phases
+
+**Phase 1 — Core (MVP)**
+1. Next.js scaffold + Tailwind, deploy to Vercel
+2. Hardcode 2–3 channels in `channels.json`
+3. `/api/videos` with caching + grid UI + nocookie player
+4. PWA manifest + service worker, install on kid device
+
+**Phase 2 — Channel management**
+5. GitHub commit flow (`/api/add-channel`, `/api/remove-channel`)
+6. `/api/search-channel` + manage screen UI
+7. PIN gate + rate limiting
+
+**Phase 3 — Polish**
+8. Offline fallback for the grid, loading/skeleton states
+9. Kid-friendly theming, large touch targets, haptics-free simple UI
+10. Optional: Vercel Cron to pre-warm `/api/videos` cache; optional per-channel tabs
+
+## 10. Quota Sanity Check
+
+- 10,000 units/day free
+- `playlistItems.list` = 1 unit × N channels per cache miss (~1/hour) → e.g. 10 channels ≈ 240 units/day worst case
+- `search.list` = 100 units, parent-only, a few per month
+- Effectively unlimited headroom for family use
