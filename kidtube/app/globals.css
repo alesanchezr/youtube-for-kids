@@ -17,3 +17,4 @@
 .kt-press { transition: transform .15s cubic-bezier(.34,1.56,.64,1); }
 .kt-press:hover { transform: scale(1.05); }
 .kt-press:active { transform: scale(.93); }
+.kt-hide-scrollbar::-webkit-scrollbar { display: none; }

@@ -6,23 +6,39 @@ import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { kt } from "@/lib/kidtube";
 import type { Video } from "@/lib/types";
+import { getActiveProfileId } from "@/lib/active-profile";
+import { VideoRail } from "@/components/VideoRail";
 
 export default function Player() {
   const { id } = useParams<{ id: string }>();
-  const [video, setVideo] = useState<Video | null>(null);
+  const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const video = useMemo(
+    () => videos.find((v) => v.id === id) ?? null,
+    [videos, id],
+  );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/videos");
+        const profileId = getActiveProfileId();
+        if (!profileId) {
+          if (!cancelled) {
+            setVideos([]);
+            setLoading(false);
+          }
+          return;
+        }
+        const res = await fetch(`/api/videos?profileId=${encodeURIComponent(profileId)}`, {
+          cache: "no-store",
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load");
-        const found = (data.videos as Video[] | undefined)?.find((v) => v.id === id) ?? null;
-        if (!cancelled) setVideo(found);
+        if (!cancelled) setVideos(data.videos || []);
       } catch {
-        if (!cancelled) setVideo(null);
+        if (!cancelled) setVideos([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -75,54 +91,17 @@ export default function Player() {
                 title={video?.title || "Video"}
                 src={embedSrc}
                 className="absolute inset-0 w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
+                sandbox="allow-scripts allow-same-origin allow-presentation"
               />
             ) : null}
           </div>
 
-          <div className="mt-6 flex items-center gap-4 px-1">
-            {video?.channel.thumbnail ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={video.channel.thumbnail}
-                alt={video.channel.name}
-                className="rounded-full object-cover"
-                style={{ width: 56, height: 56, border: `3px solid rgba(255,255,255,.2)` }}
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div
-                className="rounded-full flex items-center justify-center font-extrabold"
-                style={{
-                  width: 56,
-                  height: 56,
-                  border: `3px solid rgba(255,255,255,.2)`,
-                  backgroundColor: "rgba(255,255,255,.1)",
-                  color: "#FFF6E9",
-                }}
-              >
-                {(video?.channel.name || "?").slice(0, 1)}
-              </div>
-            )}
-            <div>
-              <p
-                style={{
-                  fontFamily: "'Baloo 2', sans-serif",
-                  fontWeight: 800,
-                  fontSize: "clamp(1.2rem, 3vw, 1.7rem)",
-                  color: "#FFF6E9",
-                  lineHeight: 1.15,
-                }}
-              >
-                {loading ? "Loading…" : video?.title || "Video"}
-              </p>
-              <p className="font-bold" style={{ color: "rgba(255,246,233,.55)" }}>
-                {video?.channel.name || ""}
-              </p>
-            </div>
-          </div>
+          {!loading && videos.length > 0 && (
+            <VideoRail videos={videos} activeId={typeof id === "string" ? id : undefined} />
+          )}
         </div>
       </div>
     </div>

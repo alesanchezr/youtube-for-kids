@@ -1,5 +1,6 @@
-import type { Channel, ChannelsFile } from "./types";
-import { CHANNELS_REPO_PATH } from "./channels-store";
+import type { Channel, ChannelsFile, Profile } from "./types";
+import { PROFILE_COLORS } from "./types";
+import { CHANNELS_REPO_PATH, normalizeChannelsFile } from "./channels-store";
 
 function repo(): string {
   const r = process.env.GITHUB_REPO;
@@ -35,7 +36,7 @@ async function getChannelsFile(): Promise<{ sha: string; data: ChannelsFile }> {
   }
   const file = (await res.json()) as GhContent;
   const json = Buffer.from(file.content, "base64").toString("utf8");
-  return { sha: file.sha, data: JSON.parse(json) as ChannelsFile };
+  return { sha: file.sha, data: normalizeChannelsFile(JSON.parse(json)) };
 }
 
 async function putChannelsFile(data: ChannelsFile, sha: string, message: string) {
@@ -57,25 +58,91 @@ async function putChannelsFile(data: ChannelsFile, sha: string, message: string)
   }
 }
 
-export async function addChannel(channel: Channel): Promise<ChannelsFile> {
+function requireProfile(data: ChannelsFile, profileId: string): Profile {
+  const profile = data.profiles.find((p) => p.id === profileId);
+  if (!profile) throw new Error("Profile not found.");
+  return profile;
+}
+
+export async function addChannel(profileId: string, channel: Channel): Promise<ChannelsFile> {
   const { sha, data } = await getChannelsFile();
-  if (data.channels.some((c) => c.id === channel.id)) {
+  const profile = requireProfile(data, profileId);
+  if (profile.channels.some((c) => c.id === channel.id)) {
     return data;
   }
-  const next: ChannelsFile = { channels: [...data.channels, channel] };
-  await putChannelsFile(next, sha, `chore: add channel ${channel.name}`);
+  const next: ChannelsFile = {
+    profiles: data.profiles.map((p) =>
+      p.id === profileId ? { ...p, channels: [...p.channels, channel] } : p,
+    ),
+  };
+  await putChannelsFile(next, sha, `chore: add channel ${channel.name} to ${profile.name}`);
   return next;
 }
 
-export async function removeChannel(channelId: string): Promise<ChannelsFile> {
+export async function removeChannel(profileId: string, channelId: string): Promise<ChannelsFile> {
   const { sha, data } = await getChannelsFile();
-  const target = data.channels.find((c) => c.id === channelId);
+  const profile = requireProfile(data, profileId);
+  const target = profile.channels.find((c) => c.id === channelId);
+  if (!target) return data;
   const next: ChannelsFile = {
-    channels: data.channels.filter((c) => c.id !== channelId),
+    profiles: data.profiles.map((p) =>
+      p.id === profileId
+        ? { ...p, channels: p.channels.filter((c) => c.id !== channelId) }
+        : p,
+    ),
   };
-  if (next.channels.length === data.channels.length) {
-    return data;
+  await putChannelsFile(next, sha, `chore: remove channel ${target.name} from ${profile.name}`);
+  return next;
+}
+
+export async function addProfile(name: string, color?: string): Promise<ChannelsFile> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Profile name is required.");
+  const { sha, data } = await getChannelsFile();
+  const id = `profile-${Date.now().toString(36)}`;
+  const nextColor =
+    color || PROFILE_COLORS[data.profiles.length % PROFILE_COLORS.length];
+  const profile: Profile = {
+    id,
+    name: trimmed,
+    color: nextColor,
+    channels: [],
+  };
+  const next: ChannelsFile = { profiles: [...data.profiles, profile] };
+  await putChannelsFile(next, sha, `chore: add profile ${trimmed}`);
+  return next;
+}
+
+export async function updateProfile(
+  profileId: string,
+  updates: { name?: string; color?: string },
+): Promise<ChannelsFile> {
+  const { sha, data } = await getChannelsFile();
+  requireProfile(data, profileId);
+  const nextName = updates.name?.trim();
+  const next: ChannelsFile = {
+    profiles: data.profiles.map((p) => {
+      if (p.id !== profileId) return p;
+      return {
+        ...p,
+        name: nextName || p.name,
+        color: updates.color || p.color,
+      };
+    }),
+  };
+  await putChannelsFile(next, sha, `chore: update profile ${nextName || profileId}`);
+  return next;
+}
+
+export async function removeProfile(profileId: string): Promise<ChannelsFile> {
+  const { sha, data } = await getChannelsFile();
+  const target = requireProfile(data, profileId);
+  if (data.profiles.length <= 1) {
+    throw new Error("Cannot remove the last profile.");
   }
-  await putChannelsFile(next, sha, `chore: remove channel ${target?.name || channelId}`);
+  const next: ChannelsFile = {
+    profiles: data.profiles.filter((p) => p.id !== profileId),
+  };
+  await putChannelsFile(next, sha, `chore: remove profile ${target.name}`);
   return next;
 }

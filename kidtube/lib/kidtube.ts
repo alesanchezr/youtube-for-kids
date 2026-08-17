@@ -11,4 +11,4 @@ export const kt = {
   inkSoft: "#5E7B74",
 };
 
-export type { Channel, Video } from "./types";
+export type { Channel, Profile, Video } from "./types";

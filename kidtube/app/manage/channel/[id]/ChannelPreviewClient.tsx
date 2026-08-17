@@ -18,6 +18,7 @@ export default function ChannelPreviewClient() {
 
   const name = searchParams.get("name") || "Channel";
   const thumbnail = searchParams.get("thumbnail") || "";
+  const profileId = searchParams.get("profileId") || "";
 
   const [pin, setPin] = useState<string | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -69,14 +70,14 @@ export default function ChannelPreviewClient() {
   }, [load]);
 
   const addChannel = async () => {
-    if (!pin || !id || added || adding) return;
+    if (!pin || !id || !profileId || added || adding) return;
     setAdding(true);
     setError(null);
     try {
       const res = await fetch("/api/add-channel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, id, name, thumbnail }),
+        body: JSON.stringify({ pin, profileId, id, name, thumbnail }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to add");
@@ -100,7 +101,7 @@ export default function ChannelPreviewClient() {
         }}
       >
         <Link
-          href="/manage"
+          href={profileId ? `/manage/${encodeURIComponent(profileId)}` : "/manage"}
           className="kt-press flex items-center justify-center rounded-full shrink-0"
           style={{ width: 44, height: 44, backgroundColor: "white", border: `2px solid ${kt.ink}14` }}
           aria-label="Back to manage"
@@ -145,12 +146,12 @@ export default function ChannelPreviewClient() {
         </div>
         <button
           onClick={() => void addChannel()}
-          disabled={added || adding}
+          disabled={added || adding || !profileId}
           className="kt-press flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold shrink-0"
           style={{
             backgroundColor: added ? kt.tealSoft : kt.teal,
             color: added ? kt.teal : "white",
-            opacity: adding ? 0.7 : 1,
+            opacity: adding || !profileId ? 0.7 : 1,
           }}
         >
           {added ? <Check size={16} /> : <Plus size={16} />}

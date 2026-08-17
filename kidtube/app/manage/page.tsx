@@ -1,35 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Search, Plus, Trash2, Check, Clock, ShieldCheck, Delete, Eye } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Plus, Clock, ShieldCheck, Delete } from "lucide-react";
 import { kt } from "@/lib/kidtube";
-import type { Channel } from "@/lib/types";
+import type { Profile } from "@/lib/types";
+import { PROFILE_COLORS } from "@/lib/types";
 import { Wordmark } from "@/components/Wordmark";
-
-type SearchResult = {
-  id: string;
-  name: string;
-  thumbnail: string;
-  description: string;
-};
+import { setActiveProfileId } from "@/lib/active-profile";
 
 const PIN_SESSION_KEY = "kidtube_admin_pin";
 
 export default function Manage() {
+  const router = useRouter();
   const [pin, setPin] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
   const [sessionPin, setSessionPin] = useState("");
-  const [approved, setApproved] = useState<Channel[]>([]);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [addedIds, setAddedIds] = useState<string[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [showBanner, setShowBanner] = useState(false);
   const [bannerText, setBannerText] = useState("Updating… changes appear in the kid view in about 2 minutes.");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [addingKid, setAddingKid] = useState(false);
+  const [newProfileName, setNewProfileName] = useState("");
 
   useEffect(() => {
     const saved = sessionStorage.getItem(PIN_SESSION_KEY);
@@ -44,7 +39,7 @@ export default function Manage() {
       if (res.ok) {
         setSessionPin(saved);
         setUnlocked(true);
-        setApproved(data.channels || []);
+        setProfiles(data.profiles || []);
       } else {
         sessionStorage.removeItem(PIN_SESSION_KEY);
       }
@@ -69,7 +64,7 @@ export default function Manage() {
       sessionStorage.setItem(PIN_SESSION_KEY, nextPin);
       setSessionPin(nextPin);
       setUnlocked(true);
-      setApproved(data.channels || []);
+      setProfiles(data.profiles || []);
     } catch {
       setPinError("Could not reach the server.");
       setPin("");
@@ -93,62 +88,36 @@ export default function Manage() {
     }
   };
 
-  const runSearch = useCallback(async () => {
-    if (!sessionPin || query.trim().length < 2) return;
-    setSearching(true);
+  const createProfile = async () => {
+    const name = newProfileName.trim();
+    if (!name) return;
     setActionError(null);
     try {
-      const res = await fetch(`/api/search-channel?q=${encodeURIComponent(query.trim())}&pin=${encodeURIComponent(sessionPin)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Search failed");
-      setResults(data.results || []);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Search failed");
-      setResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }, [query, sessionPin]);
-
-  const add = async (r: SearchResult) => {
-    setActionError(null);
-    try {
-      const res = await fetch("/api/add-channel", {
+      const res = await fetch("/api/add-profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pin: sessionPin,
-          id: r.id,
-          name: r.name,
-          thumbnail: r.thumbnail,
+          name,
+          color: PROFILE_COLORS[profiles.length % PROFILE_COLORS.length],
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to add");
-      setApproved(data.channels || []);
-      setAddedIds((ids) => [...ids, r.id]);
+      if (!res.ok) throw new Error(data.error || "Failed to add profile");
+      const next: Profile[] = data.profiles || [];
+      const created = next.find((p) => p.name === name) || next[next.length - 1];
+      setProfiles(next);
+      if (created?.id) {
+        setActiveProfileId(created.id);
+        router.push(`/manage/${encodeURIComponent(created.id)}`);
+        return;
+      }
+      setNewProfileName("");
+      setAddingKid(false);
       setBannerText(data.message || bannerText);
       setShowBanner(true);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to add channel");
-    }
-  };
-
-  const remove = async (c: Channel) => {
-    setActionError(null);
-    try {
-      const res = await fetch("/api/remove-channel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: sessionPin, id: c.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to remove");
-      setApproved(data.channels || []);
-      setBannerText(data.message || bannerText);
-      setShowBanner(true);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to remove channel");
+      setActionError(err instanceof Error ? err.message : "Failed to add profile");
     }
   };
 
@@ -170,7 +139,7 @@ export default function Manage() {
             Grown-ups only
           </h1>
           <p className="mt-1 text-sm font-semibold" style={{ color: kt.inkSoft }}>
-            Enter your PIN to manage channels
+            Enter your PIN to manage kids & channels
           </p>
           <div className="mt-6 flex justify-center gap-3">
             {[0, 1, 2, 3].map((i) => (
@@ -240,10 +209,10 @@ export default function Manage() {
         </Link>
         <div className="min-w-0 flex-1">
           <h1 style={{ fontFamily: "'Baloo 2', sans-serif", fontWeight: 800, fontSize: "1.35rem", color: kt.ink, lineHeight: 1.1 }}>
-            Manage channels
+            Manage kids
           </h1>
           <p className="text-xs font-bold" style={{ color: kt.inkSoft }}>
-            Only channels on this list can appear in the app
+            Tap a kid to manage their channels
           </p>
         </div>
         <span
@@ -288,158 +257,102 @@ export default function Manage() {
       <main className="px-5 sm:px-8 py-6 max-w-3xl mx-auto w-full space-y-8 pb-16">
         <section>
           <h2 className="mb-3 text-sm font-black uppercase tracking-wider" style={{ color: kt.inkSoft }}>
-            Find a channel to add
+            Kids
           </h2>
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void runSearch();
-            }}
-          >
-            <div className="relative flex-1">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2" color={kt.inkSoft} />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="w-full pl-11 pr-4 h-12 rounded-2xl bg-white text-base font-semibold outline-none focus:ring-2"
-                style={{ border: `2px solid ${kt.ink}14`, color: kt.ink }}
-                placeholder="Search YouTube channels"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={searching || query.trim().length < 2}
-              className="kt-press rounded-2xl px-5 font-extrabold text-white shrink-0"
-              style={{ backgroundColor: kt.teal, opacity: searching || query.trim().length < 2 ? 0.6 : 1 }}
-            >
-              {searching ? "…" : "Search"}
-            </button>
-          </form>
-          <div className="mt-3 space-y-2">
-            {results.map((r, i) => {
-              const already = approved.some((c) => c.id === r.id) || addedIds.includes(r.id);
-              return (
-                <div
-                  key={r.id}
-                  className="flex items-center gap-4 rounded-2xl bg-white p-3.5"
-                  style={{ border: `2px solid ${kt.ink}10`, animation: `kt-pop-in .4s ease both`, animationDelay: `${i * 70}ms` }}
-                >
-                  {r.thumbnail ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={r.thumbnail}
-                      alt={r.name}
-                      className="rounded-full object-cover"
-                      style={{ width: 48, height: 48 }}
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div
-                      className="rounded-full flex items-center justify-center font-extrabold"
-                      style={{ width: 48, height: 48, backgroundColor: kt.tealSoft, color: kt.teal }}
-                    >
-                      {r.name.slice(0, 1)}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-extrabold truncate" style={{ color: kt.ink }}>
-                      {r.name}
-                    </p>
-                    <p className="text-xs font-semibold truncate" style={{ color: kt.inkSoft }}>
-                      {r.description || r.id}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Link
-                      href={`/manage/channel/${encodeURIComponent(r.id)}?name=${encodeURIComponent(r.name)}&thumbnail=${encodeURIComponent(r.thumbnail)}`}
-                      className="kt-press flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-extrabold"
-                      style={{
-                        backgroundColor: kt.cream,
-                        color: kt.ink,
-                        border: `2px solid ${kt.ink}14`,
-                      }}
-                    >
-                      <Eye size={16} />
-                      Preview
-                    </Link>
-                    <button
-                      onClick={() => !already && void add(r)}
-                      disabled={already}
-                      className="kt-press flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold"
-                      style={{
-                        backgroundColor: already ? kt.tealSoft : kt.teal,
-                        color: already ? kt.teal : "white",
-                      }}
-                    >
-                      {already ? <Check size={16} /> : <Plus size={16} />}
-                      {already ? "Added" : "Add"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-sm font-black uppercase tracking-wider" style={{ color: kt.inkSoft }}>
-            Approved channels · {approved.length}
-          </h2>
-          <div className="space-y-2">
-            {approved.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center gap-4 rounded-2xl bg-white p-3.5"
-                style={{ border: `2px solid ${kt.ink}10` }}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {profiles.map((p) => (
+              <Link
+                key={p.id}
+                href={`/manage/${encodeURIComponent(p.id)}`}
+                className="kt-press flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1.5 font-extrabold text-sm"
+                style={{
+                  backgroundColor: "white",
+                  color: kt.ink,
+                  border: `2px solid ${kt.ink}14`,
+                }}
               >
-                {c.thumbnail ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={c.thumbnail}
-                    alt={c.name}
-                    className="rounded-full object-cover"
-                    style={{ width: 48, height: 48, border: `3px solid ${kt.tealSoft}` }}
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div
-                    className="rounded-full flex items-center justify-center font-extrabold"
-                    style={{
-                      width: 48,
-                      height: 48,
-                      border: `3px solid ${kt.tealSoft}`,
-                      backgroundColor: kt.tealSoft,
-                      color: kt.teal,
-                    }}
-                  >
-                    {c.name.slice(0, 1)}
-                  </div>
-                )}
-                <p className="font-extrabold flex-1 truncate" style={{ color: kt.ink }}>
-                  {c.name}
-                </p>
-                <button
-                  aria-label={`Remove ${c.name}`}
-                  onClick={() => void remove(c)}
-                  className="kt-press flex items-center justify-center rounded-full"
-                  style={{ width: 40, height: 40, backgroundColor: kt.coralSoft, color: kt.coral }}
+                <span
+                  className="flex items-center justify-center rounded-full text-xs font-extrabold text-white"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    backgroundColor: p.color,
+                    fontFamily: "'Baloo 2', sans-serif",
+                  }}
                 >
-                  <Trash2 size={18} />
-                </button>
-              </div>
+                  {p.name.slice(0, 1).toUpperCase()}
+                </span>
+                {p.name}
+              </Link>
             ))}
-            {approved.length === 0 && (
-              <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: kt.creamDeep }}>
-                <p className="font-extrabold" style={{ color: kt.ink }}>
-                  No channels yet
-                </p>
-                <p className="text-sm font-semibold mt-1" style={{ color: kt.inkSoft }}>
-                  Search above to add the first one — the kid view stays empty until you do.
-                </p>
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setAddingKid(true);
+                setNewProfileName("");
+              }}
+              className="kt-press flex items-center justify-center rounded-full font-extrabold"
+              style={{
+                width: 39,
+                height: 39,
+                backgroundColor: "white",
+                color: kt.teal,
+                border: `2px dashed ${kt.teal}66`,
+              }}
+              aria-label="Add another kid"
+            >
+              <Plus size={18} strokeWidth={2.75} />
+            </button>
           </div>
+
+          {addingKid && (
+            <form
+              className="flex gap-2 mb-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void createProfile();
+              }}
+            >
+              <input
+                value={newProfileName}
+                onChange={(e) => setNewProfileName(e.target.value)}
+                className="flex-1 h-11 rounded-2xl bg-white px-4 text-sm font-semibold outline-none"
+                style={{ border: `2px solid ${kt.ink}14`, color: kt.ink }}
+                placeholder="Kid’s name"
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={!newProfileName.trim()}
+                className="kt-press rounded-2xl px-4 font-extrabold text-white shrink-0"
+                style={{ backgroundColor: kt.teal, opacity: newProfileName.trim() ? 1 : 0.5 }}
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingKid(false);
+                  setNewProfileName("");
+                }}
+                className="kt-press rounded-2xl px-4 font-extrabold shrink-0"
+                style={{ backgroundColor: kt.cream, color: kt.ink, border: `2px solid ${kt.ink}14` }}
+              >
+                Cancel
+              </button>
+            </form>
+          )}
+
+          {profiles.length === 0 && !addingKid && (
+            <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: kt.creamDeep }}>
+              <p className="font-extrabold" style={{ color: kt.ink }}>
+                No kids yet
+              </p>
+              <p className="text-sm font-semibold mt-1" style={{ color: kt.inkSoft }}>
+                Tap + to add the first profile.
+              </p>
+            </div>
+          )}
         </section>
       </main>
     </div>

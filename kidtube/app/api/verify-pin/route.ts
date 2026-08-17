@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listChannels } from "@/lib/channels-store";
+import { listProfiles } from "@/lib/channels-store";
 import { clientIp, verifyPin } from "@/lib/pin";
 
 export const runtime = "nodejs";
@@ -18,5 +18,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  return NextResponse.json({ ok: true, channels: listChannels() });
+  return NextResponse.json({ ok: true, profiles: listProfiles() });
 }

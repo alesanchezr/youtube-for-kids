@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addChannel } from "@/lib/github";
+import { removeProfile } from "@/lib/github";
 import { getProfile } from "@/lib/channels-store";
 import { clientIp, verifyPin } from "@/lib/pin";
 
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const ip = clientIp(request);
-  let body: { pin?: string; profileId?: string; id?: string; name?: string; thumbnail?: string };
+  let body: { pin?: string; id?: string };
   try {
     body = await request.json();
   } catch {
@@ -19,30 +19,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  if (!body.profileId || !body.id || !body.name) {
-    return NextResponse.json({ error: "profileId, id and name are required." }, { status: 400 });
+  if (!body.id) {
+    return NextResponse.json({ error: "id is required." }, { status: 400 });
   }
 
-  if (!getProfile(body.profileId)) {
+  if (!getProfile(body.id)) {
     return NextResponse.json({ error: "Profile not found." }, { status: 404 });
   }
 
   try {
-    const data = await addChannel(body.profileId, {
-      id: body.id,
-      name: body.name,
-      thumbnail: body.thumbnail || "",
-    });
-    const profile = data.profiles.find((p) => p.id === body.profileId);
+    const data = await removeProfile(body.id);
     return NextResponse.json({
       profiles: data.profiles,
-      channels: profile?.channels || [],
       status: "pending_deploy",
-      message: "Channel added. Kid view updates after redeploy (~1–2 min).",
+      message: "Profile removed. Kid view updates after redeploy (~1–2 min).",
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to add channel";
-    console.error("/api/add-channel", message);
+    const message = err instanceof Error ? err.message : "Failed to remove profile";
+    console.error("/api/remove-profile", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

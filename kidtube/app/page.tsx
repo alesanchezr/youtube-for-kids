@@ -2,38 +2,122 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { RefreshCw, MoreVertical } from "lucide-react";
+import { RefreshCw, MoreVertical, Users } from "lucide-react";
 import { kt } from "@/lib/kidtube";
 import type { Video } from "@/lib/types";
 import { Wordmark } from "@/components/Wordmark";
 import { VideoGrid } from "@/components/VideoGrid";
+import { ProfilePicker, type ProfileSummary } from "@/components/ProfilePicker";
+import {
+  clearActiveProfileId,
+  getActiveProfileId,
+  setActiveProfileId,
+} from "@/lib/active-profile";
 
 export default function Grid() {
+  const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
+  const [activeProfileId, setActiveId] = useState<string | null>(null);
+  const [profileReady, setProfileReady] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [activeName, setActiveName] = useState<string | null>(null);
+  const [activeColor, setActiveColor] = useState<string | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const load = useCallback(async (showSpin = false) => {
-    if (showSpin) setSpinning(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/videos", { cache: "no-store" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load videos");
-      setVideos(data.videos || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load videos");
-    } finally {
-      setLoading(false);
-      if (showSpin) setTimeout(() => setSpinning(false), 700);
-    }
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/profiles", { cache: "no-store" });
+        const data = await res.json();
+        const list: ProfileSummary[] = data.profiles || [];
+        setProfiles(list);
+
+        const saved = getActiveProfileId();
+        const valid = saved && list.some((p) => p.id === saved) ? saved : null;
+        if (valid) {
+          setActiveId(valid);
+          const p = list.find((x) => x.id === valid);
+          setActiveName(p?.name || null);
+          setActiveColor(p?.color || null);
+        } else if (saved) {
+          clearActiveProfileId();
+        }
+      } catch {
+        setProfiles([]);
+      } finally {
+        setProfileReady(true);
+      }
+    })();
   }, []);
 
+  const selectProfile = (profileId: string) => {
+    setActiveProfileId(profileId);
+    setActiveId(profileId);
+    const p = profiles.find((x) => x.id === profileId);
+    setActiveName(p?.name || null);
+    setActiveColor(p?.color || null);
+    setPicking(false);
+    setMenuOpen(false);
+  };
+
+  const load = useCallback(
+    async (showSpin = false) => {
+      if (!activeProfileId) return;
+      if (showSpin) setSpinning(true);
+      setError(null);
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/videos?profileId=${encodeURIComponent(activeProfileId)}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load videos");
+        setVideos(data.videos || []);
+        if (data.profile?.name) setActiveName(data.profile.name);
+        if (data.profile?.color) setActiveColor(data.profile.color);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load videos");
+      } finally {
+        setLoading(false);
+        if (showSpin) setTimeout(() => setSpinning(false), 700);
+      }
+    },
+    [activeProfileId],
+  );
+
   useEffect(() => {
+    if (!activeProfileId || picking) return;
     void load();
-  }, [load]);
+  }, [activeProfileId, picking, load]);
+
+  if (!profileReady) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center">
+        <div
+          className="rounded-full animate-pulse"
+          style={{ width: 48, height: 48, backgroundColor: kt.tealSoft }}
+        />
+      </div>
+    );
+  }
+
+  if (picking || !activeProfileId) {
+    return (
+      <ProfilePicker
+        profiles={profiles}
+        onSelect={selectProfile}
+        title={picking ? "Switch kid" : "Who’s watching?"}
+        subtitle={
+          picking
+            ? "This device will remember your choice"
+            : "We’ll keep this kid selected on this device"
+        }
+      />
+    );
+  }
 
   return (
     <div className="min-h-[100dvh]">
@@ -45,7 +129,36 @@ export default function Grid() {
           borderBottom: `2px dashed ${kt.teal}22`,
         }}
       >
-        <Wordmark />
+        <div className="flex items-center gap-3 min-w-0">
+          <Wordmark />
+          {activeName && (
+            <button
+              type="button"
+              onClick={() => setPicking(true)}
+              className="kt-press hidden sm:flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1.5"
+              style={{
+                backgroundColor: "white",
+                border: `2px solid ${kt.ink}12`,
+              }}
+              aria-label={`Switch from ${activeName}`}
+            >
+              <span
+                className="flex items-center justify-center rounded-full text-white text-xs font-extrabold"
+                style={{
+                  width: 28,
+                  height: 28,
+                  backgroundColor: activeColor || kt.sun,
+                  fontFamily: "'Baloo 2', sans-serif",
+                }}
+              >
+                {activeName.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="font-extrabold text-sm truncate max-w-[120px]" style={{ color: kt.ink }}>
+                {activeName}
+              </span>
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button
             aria-label="Refresh videos"
@@ -74,12 +187,24 @@ export default function Grid() {
                 className="absolute right-0 mt-2 rounded-xl bg-white py-1.5 whitespace-nowrap z-30"
                 style={{ border: `2px solid ${kt.ink}12`, boxShadow: "0 8px 24px rgba(0,0,0,.12)" }}
               >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setPicking(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm font-bold hover:opacity-70 text-left"
+                  style={{ color: kt.ink }}
+                >
+                  <Users size={16} />
+                  Switch kid
+                </button>
                 <Link
                   href="/manage"
                   className="block px-4 py-2 text-sm font-bold hover:opacity-70"
                   style={{ color: kt.ink }}
                 >
-                  Grown-ups: manage channels
+                  Grown-ups: manage
                 </Link>
               </div>
             )}
@@ -97,7 +222,7 @@ export default function Grid() {
             lineHeight: 1.1,
           }}
         >
-          What shall we watch today?
+          {activeName ? `Hi ${activeName}!` : "What shall we watch today?"}
         </h1>
         <p className="mt-1 font-bold" style={{ color: kt.inkSoft }}>
           Fresh picks from your favorite shows
@@ -136,7 +261,8 @@ export default function Grid() {
             No videos yet
           </p>
           <p className="mt-2 font-semibold" style={{ color: kt.inkSoft }}>
-            A grown-up can add channels from the menu (⋮). Until then, this grid stays empty on purpose.
+            A grown-up can add channels for {activeName || "this kid"} from the menu (⋮). Until then,
+            this grid stays empty on purpose.
           </p>
         </div>
       )}
