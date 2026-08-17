@@ -9,23 +9,36 @@ type Props = {
   activeId?: string;
   watchHref?: (video: Video) => string;
   onInteract?: () => void;
+  /** When false, skip centering the active card (avoids shifting a hidden rail). */
+  centerActive?: boolean;
 };
 
-export function VideoRail({ videos, activeId, watchHref, onInteract }: Props) {
+export function VideoRail({
+  videos,
+  activeId,
+  watchHref,
+  onInteract,
+  centerActive = true,
+}: Props) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
-    activeRef.current?.scrollIntoView({
-      behavior: "smooth",
-      inline: "center",
-      block: "nearest",
-    });
-  }, [activeId, videos]);
+    if (!centerActive) return;
+    const scroller = scrollerRef.current;
+    const active = activeRef.current;
+    if (!scroller || !active) return;
+
+    // Scroll only inside the rail — never scrollIntoView (that shifts the watch page).
+    const left = active.offsetLeft - (scroller.clientWidth - active.clientWidth) / 2;
+    scroller.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+  }, [activeId, videos, centerActive]);
 
   if (videos.length === 0) return null;
 
   return (
     <div
+      ref={scrollerRef}
       className="flex gap-4 overflow-x-auto pb-1 snap-x snap-mandatory kt-hide-scrollbar"
       style={{
         WebkitOverflowScrolling: "touch",

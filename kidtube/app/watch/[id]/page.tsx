@@ -209,7 +209,7 @@ export default function Player() {
 
   return (
     <div
-      className="h-[100dvh] relative overflow-hidden"
+      className="h-[100dvh] relative overflow-hidden overscroll-none"
       style={{ backgroundColor: "#000" }}
     >
       <div ref={mountRef} className="kt-yt-mount absolute inset-0 w-full h-full" />
@@ -311,6 +311,7 @@ export default function Player() {
             videos={videos}
             activeId={typeof id === "string" ? id : undefined}
             onInteract={bumpIdle}
+            centerActive={chromeVisible}
             watchHref={(v) => `/watch/${v.id}?autoplay=1`}
           />
         </div>

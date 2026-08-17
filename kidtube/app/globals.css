@@ -29,14 +29,11 @@
   max-width: none !important;
   max-height: none !important;
 }
-/* Cover the viewport (crop edges) so letterboxing never shows the page bg */
 .kt-yt-mount iframe {
   position: absolute !important;
-  top: 50% !important;
-  left: 50% !important;
-  width: max(100%, 177.78dvh) !important;
-  height: max(100%, 56.25dvw) !important;
-  transform: translate(-50%, -50%) !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
   border: 0;
 }
 .kt-chrome {
