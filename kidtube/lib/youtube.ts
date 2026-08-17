@@ -37,11 +37,11 @@ export async function fetchChannelUploads(channel: Channel, maxPerChannel = 15):
   url.searchParams.set("maxResults", String(maxPerChannel));
   url.searchParams.set("key", apiKey());
 
-  const res = await fetch(url.toString(), { next: { revalidate: 3600 } });
+  const res = await fetch(url.toString(), { next: { revalidate: 86400 } });
   if (!res.ok) {
     const body = await res.text();
     console.error("playlistItems failed", channel.id, res.status, body);
-    return [];
+    throw new Error(`YouTube playlistItems failed (${res.status}) for ${channel.id}`);
   }
 
   const data = (await res.json()) as { items?: PlaylistItem[] };
@@ -66,7 +66,16 @@ export async function fetchChannelUploads(channel: Channel, maxPerChannel = 15):
 }
 
 export async function fetchAllVideos(channels: Channel[], limit = 60): Promise<Video[]> {
-  const batches = await Promise.all(channels.map((c) => fetchChannelUploads(c)));
+  const batches = await Promise.all(
+    channels.map(async (c) => {
+      try {
+        return await fetchChannelUploads(c);
+      } catch (err) {
+        console.error(err);
+        return [];
+      }
+    }),
+  );
   return batches
     .flat()
     .sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || ""))

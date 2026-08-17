@@ -23,7 +23,7 @@ export async function GET() {
       { videos, channels },
       {
         headers: {
-          "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400",
+          "Cache-Control": "s-maxage=86400, stale-while-revalidate=604800",
         },
       },
     );

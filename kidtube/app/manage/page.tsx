@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Search, Plus, Trash2, Check, Clock, ShieldCheck, Delete } from "lucide-react";
+import { ArrowLeft, Search, Plus, Trash2, Check, Clock, ShieldCheck, Delete, Eye } from "lucide-react";
 import { kt } from "@/lib/kidtube";
 import type { Channel } from "@/lib/types";
 import { Wordmark } from "@/components/Wordmark";
@@ -238,7 +238,7 @@ export default function Manage() {
         >
           <ArrowLeft size={20} color={kt.ink} strokeWidth={2.5} />
         </Link>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 style={{ fontFamily: "'Baloo 2', sans-serif", fontWeight: 800, fontSize: "1.35rem", color: kt.ink, lineHeight: 1.1 }}>
             Manage channels
           </h1>
@@ -246,6 +246,18 @@ export default function Manage() {
             Only channels on this list can appear in the app
           </p>
         </div>
+        <span
+          className="shrink-0 rounded-full px-3 py-1 text-xs font-black tracking-wide"
+          style={{
+            backgroundColor: kt.tealSoft,
+            color: kt.teal,
+            border: `2px solid ${kt.teal}33`,
+            fontFamily: "'Baloo 2', sans-serif",
+          }}
+          title="Increases with each git commit / deploy"
+        >
+          {`v${process.env.NEXT_PUBLIC_APP_VERSION || "0"}`}
+        </span>
       </header>
 
       {showBanner && (
@@ -315,7 +327,13 @@ export default function Manage() {
                 >
                   {r.thumbnail ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.thumbnail} alt={r.name} className="rounded-full object-cover" style={{ width: 48, height: 48 }} />
+                    <img
+                      src={r.thumbnail}
+                      alt={r.name}
+                      className="rounded-full object-cover"
+                      style={{ width: 48, height: 48 }}
+                      referrerPolicy="no-referrer"
+                    />
                   ) : (
                     <div
                       className="rounded-full flex items-center justify-center font-extrabold"
@@ -332,18 +350,32 @@ export default function Manage() {
                       {r.description || r.id}
                     </p>
                   </div>
-                  <button
-                    onClick={() => !already && void add(r)}
-                    disabled={already}
-                    className="kt-press flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold shrink-0"
-                    style={{
-                      backgroundColor: already ? kt.tealSoft : kt.teal,
-                      color: already ? kt.teal : "white",
-                    }}
-                  >
-                    {already ? <Check size={16} /> : <Plus size={16} />}
-                    {already ? "Added" : "Add"}
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      href={`/manage/channel/${encodeURIComponent(r.id)}?name=${encodeURIComponent(r.name)}&thumbnail=${encodeURIComponent(r.thumbnail)}`}
+                      className="kt-press flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-extrabold"
+                      style={{
+                        backgroundColor: kt.cream,
+                        color: kt.ink,
+                        border: `2px solid ${kt.ink}14`,
+                      }}
+                    >
+                      <Eye size={16} />
+                      Preview
+                    </Link>
+                    <button
+                      onClick={() => !already && void add(r)}
+                      disabled={already}
+                      className="kt-press flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold"
+                      style={{
+                        backgroundColor: already ? kt.tealSoft : kt.teal,
+                        color: already ? kt.teal : "white",
+                      }}
+                    >
+                      {already ? <Check size={16} /> : <Plus size={16} />}
+                      {already ? "Added" : "Add"}
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -368,6 +400,7 @@ export default function Manage() {
                     alt={c.name}
                     className="rounded-full object-cover"
                     style={{ width: 48, height: 48, border: `3px solid ${kt.tealSoft}` }}
+                    referrerPolicy="no-referrer"
                   />
                 ) : (
                   <div

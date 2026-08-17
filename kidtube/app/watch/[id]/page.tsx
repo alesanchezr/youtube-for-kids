@@ -90,6 +90,7 @@ export default function Player() {
                 alt={video.channel.name}
                 className="rounded-full object-cover"
                 style={{ width: 56, height: 56, border: `3px solid rgba(255,255,255,.2)` }}
+                referrerPolicy="no-referrer"
               />
             ) : (
               <div
