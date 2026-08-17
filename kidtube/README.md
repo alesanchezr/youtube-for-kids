@@ -10,9 +10,9 @@ Next.js App Router PWA. Whitelist-only video grid from parent-approved channels.
 
 ## APIs
 
-- `GET /api/videos` — uploads from `channels.json` via YouTube Data API
+- `GET /api/videos` — newest uploads from `channels.json` via public channel RSS
 - `POST /api/verify-pin` — unlock manage UI
-- `GET /api/search-channel?q=&pin=` — YouTube channel search (PIN required)
+- `GET /api/search-channel?q=&pin=` — YouTube channel search via Data API (PIN required)
 - `POST /api/add-channel` — commit channel to `kidtube/channels.json` via GitHub
 - `POST /api/remove-channel` — remove channel via GitHub
 

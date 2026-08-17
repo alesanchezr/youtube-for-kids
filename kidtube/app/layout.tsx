@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { kt } from "@/lib/kidtube";
+import { PwaUpdater } from "@/components/PwaUpdater";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         style={{ backgroundColor: kt.cream, color: kt.ink, fontFamily: "'Nunito', sans-serif" }}
       >
         {children}
+        <PwaUpdater />
       </body>
     </html>
   );

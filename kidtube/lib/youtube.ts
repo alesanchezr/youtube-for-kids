@@ -1,6 +1,7 @@
 import type { Channel, Video } from "./types";
 
 const YT = "https://www.googleapis.com/youtube/v3";
+const YT_RSS = "https://www.youtube.com/feeds/videos.xml";
 
 function apiKey(): string {
   const key = process.env.YOUTUBE_API_KEY;
@@ -8,56 +9,69 @@ function apiKey(): string {
   return key;
 }
 
-/** UC… channel id → UU… uploads playlist id (no extra API call). */
-export function uploadsPlaylistId(channelId: string): string {
-  if (!channelId.startsWith("UC") || channelId.length < 3) {
-    throw new Error(`Invalid channel id: ${channelId}`);
-  }
-  return `UU${channelId.slice(2)}`;
+function decodeXmlEntities(text: string): string {
+  return text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCharCode(parseInt(n, 16)))
+    .replace(/&amp;/g, "&");
 }
 
-type PlaylistItem = {
-  contentDetails?: { videoId?: string };
-  snippet?: {
-    title?: string;
-    publishedAt?: string;
-    thumbnails?: {
-      medium?: { url?: string };
-      high?: { url?: string };
-      default?: { url?: string };
-    };
-  };
-};
+function tagValue(block: string, tag: string): string {
+  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i");
+  const m = block.match(re);
+  return m?.[1]?.trim() ?? "";
+}
 
+function attrValue(block: string, tag: string, attr: string): string {
+  const re = new RegExp(`<${tag}[^>]*\\s${attr}="([^"]*)"`, "i");
+  const m = block.match(re);
+  return m?.[1] ?? "";
+}
+
+/** Newest uploads via public channel Atom feed (no API key / quota). */
 export async function fetchChannelUploads(channel: Channel, maxPerChannel = 15): Promise<Video[]> {
-  const playlistId = uploadsPlaylistId(channel.id);
-  const url = new URL(`${YT}/playlistItems`);
-  url.searchParams.set("part", "snippet,contentDetails");
-  url.searchParams.set("playlistId", playlistId);
-  url.searchParams.set("maxResults", String(maxPerChannel));
-  url.searchParams.set("key", apiKey());
-
-  const res = await fetch(url.toString(), { next: { revalidate: 86400 } });
-  if (!res.ok) {
-    const body = await res.text();
-    console.error("playlistItems failed", channel.id, res.status, body);
-    throw new Error(`YouTube playlistItems failed (${res.status}) for ${channel.id}`);
+  if (!channel.id.startsWith("UC") || channel.id.length < 3) {
+    throw new Error(`Invalid channel id: ${channel.id}`);
   }
 
-  const data = (await res.json()) as { items?: PlaylistItem[] };
+  const url = `${YT_RSS}?channel_id=${encodeURIComponent(channel.id)}`;
+  const res = await fetch(url, {
+    headers: { Accept: "application/atom+xml, application/xml, text/xml" },
+    next: { revalidate: 86400 },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("channel RSS failed", channel.id, res.status, body.slice(0, 200));
+    throw new Error(`YouTube channel RSS failed (${res.status}) for ${channel.id}`);
+  }
+
+  const xml = await res.text();
+  const entries = xml.match(/<entry>[\s\S]*?<\/entry>/gi) ?? [];
   const videos: Video[] = [];
 
-  for (const item of data.items ?? []) {
-    const id = item.contentDetails?.videoId;
-    const title = item.snippet?.title;
+  for (const entry of entries) {
+    if (videos.length >= maxPerChannel) break;
+
+    const id =
+      tagValue(entry, "yt:videoId") ||
+      tagValue(entry, "id").replace(/^yt:video:/, "");
+    const title = decodeXmlEntities(tagValue(entry, "title"));
     if (!id || !title || title === "Private video" || title === "Deleted video") continue;
-    const thumbs = item.snippet?.thumbnails;
-    const thumb = thumbs?.high?.url || thumbs?.medium?.url || thumbs?.default?.url || "";
+
+    const thumb =
+      attrValue(entry, "media:thumbnail", "url") ||
+      `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+    const publishedAt = tagValue(entry, "published");
+
     videos.push({
       id,
       title,
       thumb,
-      publishedAt: item.snippet?.publishedAt || "",
+      publishedAt,
       channel,
     });
   }
