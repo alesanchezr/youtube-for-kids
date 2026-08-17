@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { RefreshCw, MoreVertical } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,13 +8,6 @@ import {
 import { KidTubeShell, Wordmark, kt, videos } from "./_shared/kidtube";
 
 export default function Grid() {
-  const [spinning, setSpinning] = useState(false);
-
-  const refresh = () => {
-    setSpinning(true);
-    setTimeout(() => setSpinning(false), 700);
-  };
-
   return (
     <KidTubeShell>
       {/* Header */}
@@ -29,24 +21,6 @@ export default function Grid() {
       >
         <Wordmark />
         <div className="flex items-center gap-2">
-          <button
-            aria-label="Refresh videos"
-            onClick={refresh}
-            className="kt-press flex items-center justify-center rounded-full"
-            style={{
-              width: 56,
-              height: 56,
-              backgroundColor: kt.sun,
-              boxShadow: `0 4px 0 ${kt.ink}26`,
-            }}
-          >
-            <RefreshCw
-              size={26}
-              color={kt.ink}
-              strokeWidth={2.75}
-              style={spinning ? { animation: "kt-spin-once .7s ease" } : undefined}
-            />
-          </button>
           {/* De-emphasized parent menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

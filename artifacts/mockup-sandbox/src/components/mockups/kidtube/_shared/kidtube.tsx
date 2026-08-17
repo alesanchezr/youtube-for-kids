@@ -37,9 +37,6 @@ export function KidTubeShell({ children }: { children: ReactNode }) {
           0%,100% { transform: translateY(0); }
           50% { transform: translateY(-6px); }
         }
-        @keyframes kt-spin-once {
-          to { transform: rotate(360deg); }
-        }
         .kt-card { transition: transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s ease; }
         .kt-card:hover { transform: translateY(-4px) scale(1.02); }
         .kt-card:active { transform: scale(.97); }

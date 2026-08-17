@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { RefreshCw, MoreVertical, Users } from "lucide-react";
+import { MoreVertical, Users } from "lucide-react";
 import { kt } from "@/lib/kidtube";
 import type { Video } from "@/lib/types";
 import { Wordmark } from "@/components/Wordmark";
@@ -24,7 +24,6 @@ export default function Grid() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [spinning, setSpinning] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -63,30 +62,25 @@ export default function Grid() {
     setMenuOpen(false);
   };
 
-  const load = useCallback(
-    async (showSpin = false) => {
-      if (!activeProfileId) return;
-      if (showSpin) setSpinning(true);
-      setError(null);
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/videos?profileId=${encodeURIComponent(activeProfileId)}`, {
-          cache: "no-store",
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load videos");
-        setVideos(data.videos || []);
-        if (data.profile?.name) setActiveName(data.profile.name);
-        if (data.profile?.color) setActiveColor(data.profile.color);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load videos");
-      } finally {
-        setLoading(false);
-        if (showSpin) setTimeout(() => setSpinning(false), 700);
-      }
-    },
-    [activeProfileId],
-  );
+  const load = useCallback(async () => {
+    if (!activeProfileId) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/videos?profileId=${encodeURIComponent(activeProfileId)}`, {
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load videos");
+      setVideos(data.videos || []);
+      if (data.profile?.name) setActiveName(data.profile.name);
+      if (data.profile?.color) setActiveColor(data.profile.color);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load videos");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeProfileId]);
 
   useEffect(() => {
     if (!activeProfileId || picking) return;
@@ -160,19 +154,6 @@ export default function Grid() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            aria-label="Refresh videos"
-            onClick={() => void load(true)}
-            className="kt-press flex items-center justify-center rounded-full"
-            style={{ width: 56, height: 56, backgroundColor: kt.sun, boxShadow: `0 4px 0 ${kt.ink}26` }}
-          >
-            <RefreshCw
-              size={26}
-              color={kt.ink}
-              strokeWidth={2.75}
-              style={spinning ? { animation: "kt-spin-once .7s ease" } : undefined}
-            />
-          </button>
           <div className="relative">
             <button
               aria-label="More"

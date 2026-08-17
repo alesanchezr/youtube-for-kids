@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Play } from "lucide-react";
+import { ArrowLeft, Pause, Play } from "lucide-react";
 import { kt } from "@/lib/kidtube";
 import type { Video } from "@/lib/types";
 import { getActiveProfileId } from "@/lib/active-profile";
@@ -73,7 +73,7 @@ export default function Player() {
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
-  const [chromeVisible, setChromeVisible] = useState(true);
+  const [chromeVisible, setChromeVisible] = useState(false);
   const [idleNonce, setIdleNonce] = useState(0);
 
   const mountRef = useRef<HTMLDivElement>(null);
@@ -120,7 +120,8 @@ export default function Player() {
     let cancelled = false;
     setPlaying(false);
     setReady(false);
-    setChromeVisible(true);
+    const shouldAutoplay = autoplayRef.current;
+    setChromeVisible(false);
     setIdleNonce(0);
 
     (async () => {
@@ -135,8 +136,6 @@ export default function Player() {
       const host = document.createElement("div");
       host.className = "absolute inset-0 w-full h-full";
       mountRef.current.appendChild(host);
-
-      const shouldAutoplay = autoplayRef.current;
 
       playerRef.current = new YT.Player(host, {
         videoId: id,
@@ -159,8 +158,7 @@ export default function Player() {
             setReady(true);
             if (shouldAutoplay) {
               e.target.playVideo();
-              setChromeVisible(true);
-              setIdleNonce((n) => n + 1);
+              setChromeVisible(false);
               if (typeof id === "string") {
                 router.replace(`/watch/${id}`, { scroll: false });
               }
@@ -190,36 +188,63 @@ export default function Player() {
 
   function handlePlay() {
     playerRef.current?.playVideo();
+    setChromeVisible(false);
+    bumpIdle();
+  }
+
+  function handlePause() {
+    playerRef.current?.pauseVideo();
     setChromeVisible(true);
     bumpIdle();
   }
 
   function onVideoTap() {
+    setChromeVisible((v) => !v);
     bumpIdle();
-    if (!chromeVisible) {
-      setChromeVisible(true);
-      return;
-    }
-    playerRef.current?.pauseVideo();
   }
 
   const showRail = !loading && videos.length > 0;
+  const showBack = !playing || chromeVisible;
+  const controlSize = "min(28vw, 140px)";
 
   return (
     <div
       className="h-[100dvh] relative overflow-hidden"
-      style={{ backgroundColor: kt.ink }}
+      style={{ backgroundColor: "#000" }}
     >
       <div ref={mountRef} className="kt-yt-mount absolute inset-0 w-full h-full" />
 
       {playing ? (
-        <button
-          type="button"
-          onClick={onVideoTap}
-          aria-label={chromeVisible ? "Pause video" : "Show recommendations"}
-          className="absolute inset-0 z-10"
-          style={{ background: "transparent", cursor: "pointer" }}
-        />
+        <>
+          <button
+            type="button"
+            onClick={onVideoTap}
+            aria-label={chromeVisible ? "Hide recommendations" : "Show recommendations"}
+            className="absolute inset-0 z-10"
+            style={{ background: "transparent", cursor: "pointer" }}
+          />
+          <div
+            className={`kt-chrome absolute inset-0 z-20 flex items-center justify-center pointer-events-none${
+              chromeVisible ? "" : " kt-chrome-hidden"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={handlePause}
+              aria-label="Pause video"
+              className="kt-press pointer-events-auto flex items-center justify-center rounded-full"
+              style={{
+                width: controlSize,
+                height: controlSize,
+                backgroundColor: kt.sun,
+                color: kt.ink,
+                boxShadow: "0 10px 0 rgba(0,0,0,.35)",
+              }}
+            >
+              <Pause size={64} strokeWidth={2.5} fill="currentColor" />
+            </button>
+          </div>
+        </>
       ) : (
         <button
           type="button"
@@ -235,8 +260,8 @@ export default function Player() {
           <span
             className="flex items-center justify-center rounded-full"
             style={{
-              width: "min(28vw, 140px)",
-              height: "min(28vw, 140px)",
+              width: controlSize,
+              height: controlSize,
               backgroundColor: kt.sun,
               color: kt.ink,
               boxShadow: "0 10px 0 rgba(0,0,0,.35)",
@@ -256,7 +281,7 @@ export default function Player() {
       <Link
         href="/"
         className={`kt-press kt-chrome absolute top-4 left-4 z-30 inline-flex items-center gap-3 rounded-full pl-4 pr-6 py-3${
-          chromeVisible ? "" : " kt-chrome-hidden kt-chrome-back-hidden"
+          showBack ? "" : " kt-chrome-hidden kt-chrome-back-hidden"
         }`}
         style={{
           backgroundColor: kt.sun,

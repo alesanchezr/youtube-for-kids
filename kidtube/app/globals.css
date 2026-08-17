@@ -8,9 +8,6 @@
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
 }
-@keyframes kt-spin-once {
-  to { transform: rotate(360deg); }
-}
 .kt-card { transition: transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s ease; }
 .kt-card:hover { transform: translateY(-4px) scale(1.02); }
 .kt-card:active { transform: scale(.97); }
@@ -18,11 +15,29 @@
 .kt-press:hover { transform: scale(1.05); }
 .kt-press:active { transform: scale(.93); }
 .kt-hide-scrollbar::-webkit-scrollbar { display: none; }
-.kt-yt-mount iframe {
+.kt-yt-mount {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  background: #000;
+}
+.kt-yt-mount > div {
+  position: absolute !important;
+  inset: 0 !important;
   width: 100% !important;
   height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+/* Cover the viewport (crop edges) so letterboxing never shows the page bg */
+.kt-yt-mount iframe {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: max(100%, 177.78dvh) !important;
+  height: max(100%, 56.25dvw) !important;
+  transform: translate(-50%, -50%) !important;
+  border: 0;
 }
 .kt-chrome {
   transition: transform 300ms ease, opacity 300ms ease;
