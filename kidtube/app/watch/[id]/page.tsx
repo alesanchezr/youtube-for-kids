@@ -1,19 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Play, Pause } from "lucide-react";
-import { kt, videos } from "@/lib/kidtube";
+import { ArrowLeft } from "lucide-react";
+import { kt } from "@/lib/kidtube";
+import type { Video } from "@/lib/types";
 
 export default function Player() {
   const { id } = useParams<{ id: string }>();
-  const video = videos.find((v) => v.id === id) ?? videos[3];
-  const [playing, setPlaying] = useState(false);
+  const [video, setVideo] = useState<Video | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/videos");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load");
+        const found = (data.videos as Video[] | undefined)?.find((v) => v.id === id) ?? null;
+        if (!cancelled) setVideo(found);
+      } catch {
+        if (!cancelled) setVideo(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const embedSrc = useMemo(() => {
+    if (!id) return "";
+    const params = new URLSearchParams({
+      rel: "0",
+      modestbranding: "1",
+      fs: "1",
+      playsinline: "1",
+      autoplay: "1",
+    });
+    return `https://www.youtube-nocookie.com/embed/${id}?${params.toString()}`;
+  }, [id]);
 
   return (
     <div className="min-h-[100dvh] flex flex-col" style={{ backgroundColor: kt.ink }}>
-      {/* Top bar: back only */}
       <div className="p-4 sm:p-6">
         <Link
           href="/"
@@ -32,55 +64,47 @@ export default function Player() {
         </Link>
       </div>
 
-      {/* Player surface — becomes the youtube-nocookie embed in the real build */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-10 pb-8">
         <div className="w-full max-w-5xl">
           <div
             className="relative w-full aspect-video rounded-3xl overflow-hidden"
             style={{ boxShadow: "0 24px 60px rgba(0,0,0,.5)", border: `4px solid rgba(255,255,255,.08)` }}
           >
-            <img src={video.thumb} alt={video.title} className="w-full h-full object-cover" />
-            {!playing && <div className="absolute inset-0" style={{ backgroundColor: "rgba(20,35,32,.35)" }} />}
-            {/* Big play button */}
-            <button
-              aria-label={playing ? "Pause" : "Play"}
-              onClick={() => setPlaying(!playing)}
-              className="kt-press absolute inset-0 m-auto flex items-center justify-center rounded-full"
-              style={{
-                width: 110,
-                height: 110,
-                backgroundColor: kt.coral,
-                boxShadow: "0 10px 30px rgba(0,0,0,.45)",
-                opacity: playing ? 0 : 1,
-                transition: "opacity .25s ease, transform .15s cubic-bezier(.34,1.56,.64,1)",
-                animation: playing ? undefined : "kt-float 2.6s ease-in-out infinite",
-              }}
-            >
-              {playing ? (
-                <Pause size={48} color="white" fill="white" />
-              ) : (
-                <Play size={48} color="white" fill="white" style={{ marginLeft: 6 }} />
-              )}
-            </button>
-            {/* Simple progress bar */}
-            <div className="absolute bottom-0 left-0 right-0 p-4">
-              <div className="h-2.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,.25)" }}>
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: playing ? "34%" : "0%", backgroundColor: kt.coral, transition: "width 1.2s ease" }}
-                />
-              </div>
-            </div>
+            {id ? (
+              <iframe
+                title={video?.title || "Video"}
+                src={embedSrc}
+                className="absolute inset-0 w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            ) : null}
           </div>
 
-          {/* Title strip — the only text on screen */}
           <div className="mt-6 flex items-center gap-4 px-1">
-            <img
-              src={video.channel.avatar}
-              alt={video.channel.name}
-              className="rounded-full"
-              style={{ width: 56, height: 56, border: `3px solid rgba(255,255,255,.2)` }}
-            />
+            {video?.channel.thumbnail ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={video.channel.thumbnail}
+                alt={video.channel.name}
+                className="rounded-full object-cover"
+                style={{ width: 56, height: 56, border: `3px solid rgba(255,255,255,.2)` }}
+              />
+            ) : (
+              <div
+                className="rounded-full flex items-center justify-center font-extrabold"
+                style={{
+                  width: 56,
+                  height: 56,
+                  border: `3px solid rgba(255,255,255,.2)`,
+                  backgroundColor: "rgba(255,255,255,.1)",
+                  color: "#FFF6E9",
+                }}
+              >
+                {(video?.channel.name || "?").slice(0, 1)}
+              </div>
+            )}
             <div>
               <p
                 style={{
@@ -91,10 +115,10 @@ export default function Player() {
                   lineHeight: 1.15,
                 }}
               >
-                {video.title}
+                {loading ? "Loading…" : video?.title || "Video"}
               </p>
               <p className="font-bold" style={{ color: "rgba(255,246,233,.55)" }}>
-                {video.channel.name}
+                {video?.channel.name || ""}
               </p>
             </div>
           </div>

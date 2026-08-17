@@ -1,21 +1,31 @@
-# KidTube — Kid-Safe YouTube Front End (mock)
+# KidTube — Kid-Safe YouTube Front End
 
-Next.js App Router front end for the KidTube spec, currently running on mock data.
-Three routes:
+Next.js App Router PWA. Whitelist-only video grid from parent-approved channels.
 
-- `/` — kid-facing video grid (hidden three-dot menu leads to `/manage`)
-- `/watch/[id]` — distraction-free player (mock surface; swap in the youtube-nocookie embed later)
-- `/manage` — PIN-gated channel manager (any 4-digit PIN unlocks in mock mode)
+## Routes
 
-## Deploy to Vercel
+- `/` — kid-facing video grid (`GET /api/videos`)
+- `/watch/[id]` — youtube-nocookie embed player
+- `/manage` — PIN-gated channel manager
 
-1. Push this repository to GitHub.
-2. In Vercel, import the repo and set **Root Directory** to `kidtube`.
-3. Deploy — no environment variables are needed for the mock phase.
+## APIs
 
-## Next phase (per spec)
+- `GET /api/videos` — uploads from `channels.json` via YouTube Data API
+- `POST /api/verify-pin` — unlock manage UI
+- `GET /api/search-channel?q=&pin=` — YouTube channel search (PIN required)
+- `POST /api/add-channel` — commit channel to `kidtube/channels.json` via GitHub
+- `POST /api/remove-channel` — remove channel via GitHub
 
-- `app/api/videos`, `add-channel`, `remove-channel`, `search-channel` route handlers
-- `channels.json` as source of truth, committed via the GitHub Contents API
-- Env vars: `YOUTUBE_API_KEY`, `GITHUB_TOKEN`, `GITHUB_REPO`, `ADMIN_PIN`
-- Service worker + real PWA icons (192/512) at `public/icons/`
+## Local
+
+```bash
+cd kidtube
+cp .env.example .env.local
+# fill YOUTUBE_API_KEY, GITHUB_TOKEN, GITHUB_REPO, ADMIN_PIN
+npm install
+npm run dev
+```
+
+## Vercel
+
+Root Directory = `kidtube`. Set the same four env vars. Framework = Next.js.
