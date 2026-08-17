@@ -2,7 +2,7 @@
   "profiles": [
     {
       "id": "profile-1",
-      "name": "Kid 1",
+      "name": "Fer",
       "color": "#FFC24B",
       "channels": [
         {
@@ -69,6 +69,16 @@
           "id": "UC9ldJzDyA_k1uDqKD6saAjA",
           "name": "ChupiChapa",
           "thumbnail": "https://yt3.ggpht.com/TLbUeWH5CT_fxRe9z6Mp5X07pWiPSLW2m3p2DVMXRunUK4nlHXySXwKn8hIQqwNH66e7jsJq=s240-c-k-c0xffffffff-no-rj-mo"
+        },
+        {
+          "id": "UC6V_t1Fxc46gBzqYTjIvMrw",
+          "name": "Fun Caboodle",
+          "thumbnail": "https://yt3.ggpht.com/YXWGlu8Q4ed1OqyFZ5ur2SYMHa_lD47AoOVv1uUxWUlXuyy2bmTQZNLQcmaLaaddMnVXbj3v=s240-c-k-c0xffffffff-no-rj-mo"
+        },
+        {
+          "id": "UC_jCXm9x_z9_kp8DNbIs6mQ",
+          "name": "Gabby's Dollhouse",
+          "thumbnail": "https://yt3.ggpht.com/lAJuMTkcBrgIX1-rVz6esXYKxLWBzdfzLi1LPkNp-5c-ShOTwD9mBZ9YyicHx3iGE_jhUU0P=s240-c-k-c0xffffffff-no-rj-mo"
         }
       ]
     }
