@@ -18,3 +18,22 @@
 .kt-press:hover { transform: scale(1.05); }
 .kt-press:active { transform: scale(.93); }
 .kt-hide-scrollbar::-webkit-scrollbar { display: none; }
+.kt-yt-mount iframe {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+.kt-chrome {
+  transition: transform 300ms ease, opacity 300ms ease;
+}
+.kt-chrome-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.kt-chrome-rail-hidden {
+  transform: translateY(110%);
+}
+.kt-chrome-back-hidden {
+  transform: translateY(-12px);
+}

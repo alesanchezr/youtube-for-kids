@@ -8,9 +8,10 @@ type Props = {
   videos: Video[];
   activeId?: string;
   watchHref?: (video: Video) => string;
+  onInteract?: () => void;
 };
 
-export function VideoRail({ videos, activeId, watchHref }: Props) {
+export function VideoRail({ videos, activeId, watchHref, onInteract }: Props) {
   const activeRef = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
@@ -25,12 +26,15 @@ export function VideoRail({ videos, activeId, watchHref }: Props) {
 
   return (
     <div
-      className="mt-6 flex gap-4 overflow-x-auto pb-3 px-1 snap-x snap-mandatory kt-hide-scrollbar"
+      className="flex gap-4 overflow-x-auto pb-1 snap-x snap-mandatory kt-hide-scrollbar"
       style={{
         WebkitOverflowScrolling: "touch",
         scrollbarWidth: "none",
         msOverflowStyle: "none",
       }}
+      onScroll={onInteract}
+      onPointerDown={onInteract}
+      onTouchStart={onInteract}
     >
       {videos.map((v) => {
         const active = v.id === activeId;
